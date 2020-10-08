@@ -3,6 +3,7 @@ module github.com/concourse/csi-driver-image-populator
 go 1.15
 
 require (
+	github.com/concourse/baggageclaim v1.8.0
 	github.com/container-storage-interface/spec v1.0.0
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/kubernetes-csi/csi-driver-image-populator v0.0.0-20191007210111-7d245678e271

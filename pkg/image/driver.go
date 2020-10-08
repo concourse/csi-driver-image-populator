@@ -20,7 +20,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"github.com/concourse/baggageclaim/baggageclaimcmd"
+	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 )
 
 type driver struct {
@@ -75,5 +76,14 @@ func (d *driver) Run() {
 		csicommon.NewDefaultIdentityServer(d.csiDriver),
 		NewControllerServer(d.csiDriver),
 		NewNodeServer(d))
-	s.Wait()
+	// s.Wait() // no more blocking!
+
+	// start baggageclaim server
+	bagCmd := baggageclaimcmd.BaggageclaimCommand{}
+	bagCmd.Driver = "overlay"
+	// TODO: think about where to store the volumes. What's a good path?
+	bagCmd.VolumesDir = "TODO/some other location"
+	bagCmd.OverlaysDir = "todo/somewhere/on-a/pd"
+
+	bagCmd.Execute(nil)
 }
