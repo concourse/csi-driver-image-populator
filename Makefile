@@ -15,4 +15,7 @@
 CMDS=imagepopulatorplugin
 all: build
 
+image:
+	docker build -t taylorsilva/baggageclaim . && docker push taylorsilva/baggageclaim
+
 include release-tools/build.make
