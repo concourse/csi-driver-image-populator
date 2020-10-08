@@ -18,6 +18,7 @@ package image
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -31,7 +32,8 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/kubernetes/pkg/util/mount"
 
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	bclient "github.com/concourse/baggageclaim/client"
+	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 )
 
 const (
@@ -61,6 +63,17 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if len(req.GetTargetPath()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
+
+	// baggageclaim client
+	bagClient := bclient.NewWithHTTPClient("http://127.0.0.1:7788",
+		&http.Client{
+			Transport: &http.Transport{
+				ResponseHeaderTimeout: 1 * time.Minute,
+			},
+			Timeout: 5 * time.Minute,
+		})
+
+	bagClient.CreateVolume()
 
 	image := req.GetVolumeContext()["image"]
 
