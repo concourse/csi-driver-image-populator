@@ -17,6 +17,8 @@ limitations under the License.
 package image
 
 import (
+	"os"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 
@@ -76,14 +78,18 @@ func (d *driver) Run() {
 		csicommon.NewDefaultIdentityServer(d.csiDriver),
 		NewControllerServer(d.csiDriver),
 		NewNodeServer(d))
-	// s.Wait() // no more blocking!
+	// no more blocking on the grpc server
+	// s.Wait()
 
 	// start baggageclaim server
 	bagCmd := baggageclaimcmd.BaggageclaimCommand{}
 	bagCmd.Driver = "overlay"
-	// TODO: think about where to store the volumes. What's a good path?
-	bagCmd.VolumesDir = "TODO/some other location"
-	bagCmd.OverlaysDir = "todo/somewhere/on-a/pd"
+	bagCmd.VolumesDir = "/baggageclaim/volumes"
+	bagCmd.OverlaysDir = "/baggageclaim/overlay"
 
+	os.Mkdir("/baggageclaim/volumes", os.ModeDir)
+	os.Mkdir("/baggageclaim/overlay", os.ModeDir)
+
+	// block on running the baggageclaim server
 	bagCmd.Execute(nil)
 }

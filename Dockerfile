@@ -1,11 +1,12 @@
-FROM centos:centos7
+FROM concourse/golang-builder
 LABEL maintainers="Kubernetes Authors"
 LABEL description="Image Driver"
 
+ADD . /src
+WORKDIR /src
 RUN \
-  yum install -y epel-release && \
-  yum install -y buildah && \
-  yum clean all
+    mkdir -p bin && \
+    go build -o ./bin ./cmd/imagepopulatorplugin
 
 COPY ./bin/imagepopulatorplugin /imagepopulatorplugin
 ENTRYPOINT ["/imagepopulatorplugin"]

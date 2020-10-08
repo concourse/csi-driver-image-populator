@@ -14,7 +14,7 @@ spec:
       hostNetwork: true
       containers:
         - name: node-driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
+          image: docker.io/taylorsilva/baggageclaim:latest
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:
@@ -37,7 +37,7 @@ spec:
             name: registration-dir
 
         - name: image
-          image: quay.io/k8scsi/imagepopulatorplugin:canary
+          image: docker.io/taylorsilva/baggageclaim:latest
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -59,12 +59,9 @@ spec:
             - mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
-            - mountPath: /var/lib/containers/storage
+            - mountPath: /baggageclaim
               mountPropagation: Bidirectional
-              name: storageroot-dir
-            - mountPath: /var/run/containers/storage
-              mountPropagation: Bidirectional
-              name: storagerunroot-dir
+              name: baggageclaim-dir
 
       volumes:
         - hostPath:
@@ -79,12 +76,5 @@ spec:
             path: /var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
-        - hostPath:
-            path: /var/lib/containers/storage
-            type: DirectoryOrCreate
-          name: storageroot-dir
-        - hostPath:
-            path: /var/run/containers/storage
-            type: DirectoryOrCreate
-          name: storagerunroot-dir
-
+        - something:
+          name: baggageclaim-dir
