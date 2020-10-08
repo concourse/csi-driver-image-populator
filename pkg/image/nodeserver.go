@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
@@ -32,6 +31,7 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/kubernetes/pkg/util/mount"
 
+	"github.com/concourse/baggageclaim"
 	bclient "github.com/concourse/baggageclaim/client"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 )
@@ -73,11 +73,10 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			Timeout: 5 * time.Minute,
 		})
 
-	bagClient.CreateVolume()
-
-	image := req.GetVolumeContext()["image"]
-
-	err := ns.setupVolume(req.GetVolumeId(), image)
+	volume, err := bagClient.CreateVolume(lager.NewLogger("client"), req.VolumeId, baggageclaim.VolumeSpec{
+		Strategy:   baggageclaim.EmptyStrategy{},
+		Properties: map[string]string{},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -99,35 +98,15 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
-	fsType := req.GetVolumeCapability().GetMount().GetFsType()
-
-	deviceId := ""
-	if req.GetPublishContext() != nil {
-		deviceId = req.GetPublishContext()[deviceID]
-	}
-
 	readOnly := req.GetReadonly()
-	volumeId := req.GetVolumeId()
-	attrib := req.GetVolumeContext()
-	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
-
-	glog.V(4).Infof("target %v\nfstype %v\ndevice %v\nreadonly %v\nvolumeId %v\nattributes %v\n mountflags %v\n",
-		targetPath, fsType, deviceId, readOnly, volumeId, attrib, mountFlags)
 
 	options := []string{"bind"}
 	if readOnly {
 		options = append(options, "ro")
 	}
 
-	args := []string{"mount", volumeId}
-	ns.execPath = "/bin/buildah" // FIXME
-	output, err := ns.runCmd(args)
-	// FIXME handle failure.
-	provisionRoot := strings.TrimSpace(string(output[:]))
-	glog.V(4).Infof("container mount point at %s\n", provisionRoot)
-
 	mounter := mount.New("")
-	path := provisionRoot
+	path := volume.Path()
 	if err := mounter.Mount(path, targetPath, "", options); err != nil {
 		return nil, err
 	}
@@ -154,60 +133,22 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 	glog.V(4).Infof("image: volume %s/%s has been unmounted.", targetPath, volumeId)
 
-	err = ns.unsetupVolume(volumeId)
+	// baggageclaim client
+	bagClient := bclient.NewWithHTTPClient("http://127.0.0.1:7788",
+		&http.Client{
+			Transport: &http.Transport{
+				ResponseHeaderTimeout: 1 * time.Minute,
+			},
+			Timeout: 5 * time.Minute,
+		},
+	)
+
+	err = bagClient.DestroyVolume(lager.NewLogger("client"), volumeId)
 	if err != nil {
 		return nil, err
 	}
+
 	return &csi.NodeUnpublishVolumeResponse{}, nil
-}
-
-func (ns *nodeServer) setupVolume(volumeId string, image string) error {
-
-	args := []string{"from", "--name", volumeId, "--pull", image}
-	ns.execPath = "/bin/buildah" // FIXME
-	output, err := ns.runCmd(args)
-	// FIXME handle failure.
-	// FIXME handle already deleted.
-	provisionRoot := strings.TrimSpace(string(output[:]))
-	// FIXME remove
-	glog.V(4).Infof("container mount point at %s\n", provisionRoot)
-	return err
-}
-
-func (ns *nodeServer) unsetupVolume(volumeId string) error {
-
-	args := []string{"delete", volumeId}
-	ns.execPath = "/bin/buildah" // FIXME
-	output, err := ns.runCmd(args)
-	// FIXME handle failure.
-	// FIXME handle already deleted.
-	provisionRoot := strings.TrimSpace(string(output[:]))
-	// FIXME remove
-	glog.V(4).Infof("container mount point at %s\n", provisionRoot)
-	return err
-}
-
-func (ns *nodeServer) runCmd(args []string) ([]byte, error) {
-	execPath := ns.execPath
-
-	cmd := exec.Command(execPath, args...)
-
-	timeout := false
-	if ns.Timeout > 0 {
-		timer := time.AfterFunc(ns.Timeout, func() {
-			timeout = true
-			// TODO: cmd.Stop()
-		})
-		defer timer.Stop()
-	}
-
-	output, execErr := cmd.CombinedOutput()
-	if execErr != nil {
-		if timeout {
-			return nil, TimeoutError
-		}
-	}
-	return output, execErr
 }
 
 func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
