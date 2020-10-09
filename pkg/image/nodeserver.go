@@ -64,7 +64,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
-	// baggageclaim client
+	glog.V(4).Info("creating baggageclaim client")
 	bagClient := bclient.NewWithHTTPClient("http://127.0.0.1:7788",
 		&http.Client{
 			Transport: &http.Transport{
@@ -73,6 +73,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			Timeout: 5 * time.Minute,
 		})
 
+	glog.V(4).Info("requesting baggageclaim to create volume")
 	volume, err := bagClient.CreateVolume(lager.NewLogger("client"), req.VolumeId, baggageclaim.VolumeSpec{
 		Strategy:   baggageclaim.EmptyStrategy{},
 		Properties: map[string]string{},
@@ -107,6 +108,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	mounter := mount.New("")
 	path := volume.Path()
+	glog.V(4).Infof("mounting baggageclaim volume at %s", path)
 	if err := mounter.Mount(path, targetPath, "", options); err != nil {
 		return nil, err
 	}

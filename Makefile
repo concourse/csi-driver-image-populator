@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CMDS=imagepopulatorplugin
-all: build
+.PHONY: deploy
 
 image:
 	docker build -t taylorsilva/baggageclaim . && docker push taylorsilva/baggageclaim
 
-include release-tools/build.make
+deploy:
+	kubectl delete daemonsets.apps csi-imageplugin && \
+		kubectl delete csidrivers.storage.k8s.io baggageclaim.concourse-ci.org && \
+		kubectl apply -f deploy/kubernetes-latest/

@@ -73,23 +73,27 @@ func NewControllerServer(d *csicommon.CSIDriver) *controllerServer {
 }
 
 func (d *driver) Run() {
+	glog.V(4).Infof("starting node GRPC server")
 	s := csicommon.NewNonBlockingGRPCServer()
 	s.Start(d.endpoint,
 		csicommon.NewDefaultIdentityServer(d.csiDriver),
 		NewControllerServer(d.csiDriver),
 		NewNodeServer(d))
 	// no more blocking on the grpc server
-	// s.Wait()
+	s.Wait()
 
+	glog.V(4).Info("starting baggageclaim server")
 	// start baggageclaim server
 	bagCmd := baggageclaimcmd.BaggageclaimCommand{}
 	bagCmd.Driver = "overlay"
 	bagCmd.VolumesDir = "/baggageclaim/volumes"
 	bagCmd.OverlaysDir = "/baggageclaim/overlay"
 
+	glog.V(4).Info("creating volumes and overlay directories")
 	os.Mkdir("/baggageclaim/volumes", os.ModeDir)
 	os.Mkdir("/baggageclaim/overlay", os.ModeDir)
 
 	// block on running the baggageclaim server
+	glog.V(4).Info("starting and blocking on baggageclaim server")
 	bagCmd.Execute(nil)
 }
